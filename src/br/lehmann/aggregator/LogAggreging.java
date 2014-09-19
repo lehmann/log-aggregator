@@ -14,7 +14,8 @@ public class LogAggreging implements Runnable {
 
 	private Server server;
 	private WriteLogPipeline pipeline;
-	private static final Pattern LOG_PATTERN = Pattern.compile(".*--\\[(.*)\\].*\"userid=(.*)\"");
+	private static final Pattern LOG_PATTERN = Pattern
+			.compile(".*\"userid=(.*)\"");
 
 	public LogAggreging(Server server, WriteLogPipeline pipeline) {
 		this.server = server;
@@ -22,11 +23,12 @@ public class LogAggreging implements Runnable {
 	}
 
 	public static void main(String[] args) {
-		Server[] servers = null;
-		Aggregator aggregator = null;
+		Server[] servers = new Server[] { new Server("./teste-1"), new Server("./teste-2") };
+		Aggregator aggregator = new Aggregator();
 		ExecutorService poolExecutor = Executors.newCachedThreadPool();
 		for (int i = 0; i < servers.length; i++) {
-			poolExecutor.submit(new LogAggreging(servers[i], aggregator.pipeline(servers[i].getDestinFolder())));
+			poolExecutor.submit(new LogAggreging(servers[i], aggregator
+					.pipeline(servers[i])));
 		}
 		poolExecutor.shutdown();
 	}
@@ -34,16 +36,19 @@ public class LogAggreging implements Runnable {
 	@Override
 	public void run() {
 		InputStream logFile = null;
-		while((logFile = server.nextLogFile()) != null) {
+		while ((logFile = server.nextLogFile()) != null) {
 			try (Scanner scan = new Scanner(logFile)) {
-				String logLine;
-				while((logLine = scan.nextLine()) != null) {
+				while (scan.hasNextLine()) {
+					String logLine = scan.nextLine();
 					Matcher matcher = LOG_PATTERN.matcher(logLine);
-					if(matcher.find()) {
-						pipeline.addEntry(matcher.group(1), matcher.group(2), logLine);
+					if (matcher.find()) {
+						pipeline.addEntry(matcher.group(1), logLine);
 					}
 				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
+			pipeline.aggregate();
 		}
 	}
 }

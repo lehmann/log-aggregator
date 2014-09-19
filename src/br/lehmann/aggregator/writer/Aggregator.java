@@ -2,25 +2,30 @@ package br.lehmann.aggregator.writer;
 
 import java.io.File;
 import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import br.lehmann.aggregator.Server;
 
 public class Aggregator {
 	
-	Map<String, WriteLogPipeline> exclusivities = new ConcurrentHashMap<>();
+	ConcurrentHashMap<String, UserWriter> exclusivities = new ConcurrentHashMap<>();
+	ExecutorService poolExecutor = Executors.newCachedThreadPool();
 
-	public WriteLogPipeline pipeline(File destinFolder) {
-		return new WriteLogPipeline(this, destinFolder);
+	public WriteLogPipeline pipeline(Server server) {
+		return new WriteLogPipeline(this, server);
 	}
 
-	public boolean exclusivity(String userId, WriteLogPipeline applicantOwner) {
-		return exclusivities.putIfAbsent(userId, applicantOwner) == null;
-	}
-
-	public void write(String userId, Collection<LogEntry> collection) {
-		WriteLogPipeline pipeline = exclusivities.get(userId);
-		assert pipeline != null;
-		pipeline.pleaseWrite(collection);
+	public void write(String userId, Server server, Collection<String> collection) {
+		UserWriter writer = new UserWriter();
+		if(exclusivities.putIfAbsent(userId, writer) == null) {
+			writer.setDestin(new File(server.getDestinFolder(), userId).toPath());
+			poolExecutor.submit(writer);
+		} else {
+			writer = exclusivities.get(userId);
+		}
+		writer.send(collection);
 	}
 
 }
