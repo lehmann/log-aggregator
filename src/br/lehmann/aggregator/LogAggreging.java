@@ -28,6 +28,7 @@ public class LogAggreging implements Runnable {
 		for (int i = 0; i < servers.length; i++) {
 			poolExecutor.submit(new LogAggreging(servers[i], aggregator.pipeline(servers[i].getDestinFolder())));
 		}
+		poolExecutor.shutdown();
 	}
 
 	@Override
@@ -35,10 +36,12 @@ public class LogAggreging implements Runnable {
 		InputStream logFile = null;
 		while((logFile = server.nextLogFile()) != null) {
 			try (Scanner scan = new Scanner(logFile)) {
-				String logLine = scan.nextLine();
-				Matcher matcher = LOG_PATTERN.matcher(logLine);
-				if(matcher.find()) {
-					pipeline.addEntry(matcher.group(1), matcher.group(2), logLine);
+				String logLine;
+				while((logLine = scan.nextLine()) != null) {
+					Matcher matcher = LOG_PATTERN.matcher(logLine);
+					if(matcher.find()) {
+						pipeline.addEntry(matcher.group(1), matcher.group(2), logLine);
+					}
 				}
 			}
 		}
